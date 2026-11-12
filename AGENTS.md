@@ -2,8 +2,10 @@
 
 ## Project Structure & Module Organization
 
-This Python 3.14 FastAPI backend supports a gym application; current endpoints provide role-based JWT authentication for members and employees, public member registration, membership registration with mandatory cash payment by staff, temporary QR passes for gym check-ins, and ADMIN-only plan management and employee registration.
+This client-server gym application uses a Python 3.14 FastAPI backend and a React/TypeScript client; current endpoints provide role-based JWT authentication for members and employees, public member registration, membership registration with mandatory cash payment by staff, temporary QR passes for gym check-ins, and ADMIN-only plan management and employee registration.
 
+- `client/`: React + TypeScript SPA with Vite, role-specific screens, QR generation/scanning, and a typed API client with token rotation. Development proxies /auth and /api to BACKEND_URL; production Nginx proxies to backend:8000.
+- `scripts/client_e2e_server.py`: isolated backend fixture server for browser tests; requires TEST_DATABASE_URL and cleans its schema/Redis namespace on shutdown.
 - `app/main.py`: application setup and PostgreSQL pool lifespan. Token validation and authorization run through endpoint dependencies, without authentication middleware.
 - `app/routers/`: HTTP endpoints and shared error handlers.
 - `app/services/`: authentication logic and token rotation.
@@ -21,7 +23,7 @@ This Python 3.14 FastAPI backend supports a gym application; current endpoints p
 - `app/infrastructure/database/db.py`: process-wide synchronous Psycopg pool with explicit open/close lifecycle; `get_connection()` borrows connections and commits/rolls back before returning them. Shared transactions across repositories remain unchanged.
 - `app/core/` and `app/schemas/`: configuration, domain exceptions, and Pydantic request/response models.
 - `tests/`: pytest tests; `migrations/`: numbered SQL scripts such as `001_init.sql`.
-- `Dockerfile` and `compose.yaml`: backend, PostgreSQL, and Redis setup. No frontend or static assets are present.
+- `Dockerfile`, `client/Dockerfile`, and `compose.yaml`: backend, client/Nginx, PostgreSQL, and Redis setup. Client runs on port 5173 and API on 8000.
 
 ## Build, Test, and Development Commands
 
@@ -34,6 +36,15 @@ Run commands from the repository root:
 - `poetry run ruff check .`: lint Python code.
 - `poetry run ruff format .`: format Python code; review the resulting diff.
 
+Client commands (Node.js 24), also from the repository root:
+
+- `npm --prefix client ci`: install locked client dependencies.
+- `npm --prefix client run dev`: start Vite on port 5173 with API proxy.
+- `npm --prefix client run build`: check TypeScript and build production assets.
+- `npm --prefix client test`: run API client tests with Vitest.
+- `npm --prefix client run test:e2e`: run Playwright against the isolated backend/Vite servers documented in `client/README.md`.
+- `npm --prefix client run format:check`: check client formatting.
+
 The API runs on port 8000; interactive documentation is available at `/docs`.
 
 ## Coding Style & Naming Conventions
@@ -42,7 +53,7 @@ Use four-space indentation, `snake_case` for functions/modules, `PascalCase` for
 
 ## Testing Guidelines
 
-Name files `tests/test_*.py` and functions `test_*`. Tests exercise the ASGI stack directly or through FastAPI's TestClient and use pytest fixtures, parametrization, and monkeypatching without a running server or Redis. PostgreSQL registration and membership integration tests are optional: set `TEST_DATABASE_URL` to a migrated test database; they create and remove an isolated schema. Cover authentication failures, token expiry, role restrictions, refresh rotation, validation responses, and successful access when changing these flows. Membership tests also cover inclusive date overlap, concurrent insert conflicts, foreign keys, duration calculation, exact plan pricing, and rollback of membership/payment together. QR tests cover pass expiration/replacement, daily entry limits and midnight reset, eligibility, transactional rollback, and concurrent generation/scanning. Admin tests cover partial updates, price validation before persistence, authorization, duplicate names/emails, employee login, and preservation of membership/payment history. Pool tests cover connection reuse, commit/rollback, exhaustion, stale connection replacement, lifecycle, and 503 responses. Unit fixtures avoid real pools; integration fixtures close each schema-specific pool before dropping its schema. No coverage threshold is configured.
+Name files `tests/test_*.py` and functions `test_*`. Tests exercise the ASGI stack directly or through FastAPI's TestClient and use pytest fixtures, parametrization, and monkeypatching without a running server or Redis. PostgreSQL registration and membership integration tests are optional: set `TEST_DATABASE_URL` to a migrated test database; they create and remove an isolated schema. Cover authentication failures, token expiry, role restrictions, refresh rotation, validation responses, and successful access when changing these flows. Membership tests also cover inclusive date overlap, concurrent insert conflicts, foreign keys, duration calculation, exact plan pricing, and rollback of membership/payment together. QR tests cover pass expiration/replacement, daily entry limits and midnight reset, eligibility, transactional rollback, and concurrent generation/scanning. Admin tests cover partial updates, price validation before persistence, authorization, duplicate names/emails, employee login, and preservation of membership/payment history. Pool tests cover connection reuse, commit/rollback, exhaustion, stale connection replacement, lifecycle, and 503 responses. Unit fixtures avoid real pools; integration fixtures close each schema-specific pool before dropping its schema. Client tests cover token rotation, failure handling, exact price/PATCH payloads, and a real-browser MEMBER/STAFF/ADMIN flow against isolated PostgreSQL/Redis data. Use the configured test backend for browser tests, never production accounts. No coverage threshold is configured.
 
 ## Commit & Pull Request Guidelines
 
@@ -59,3 +70,7 @@ Copy `.env.example` to `.env` and set `DB_PASSWORD` and a `JWT_SECRET` of at lea
   whether AGENTS.md needs updating.
 - Do not update AGENTS.md for minor implementation changes.
 - Preserve existing instructions unless they are obsolete.
+
+## Client architecture
+
+Keep UI in `client/src/components` and `client/src/pages`, API contracts/session handling in `client/src/lib`, and business authorization in FastAPI. The client uses existing endpoints; the API has no member/plan list endpoints, so staff and admin forms use IDs. Tokens stay in memory and tab-scoped sessionStorage; never store passwords. Do not persist QR codes or tokens in logs. Use relative /auth and /api URLs through the same-origin proxy. Price strings preserve decimal precision and PATCH omits empty fields. Camera usage requires HTTPS or localhost; image/manual scanning remains available. See `client/README.md`.

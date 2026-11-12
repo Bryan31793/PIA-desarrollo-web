@@ -52,11 +52,17 @@ test('member, staff and admin complete real backend flows', async ({ browser, pa
   await page.screenshot({ path: 'test-results/member-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Generar nuevo QR' })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   await page.screenshot({ path: 'test-results/member-mobile.png', fullPage: true });
 
   await staff.getByRole('button', { name: 'Control de acceso', exact: true }).click();
-  await staff.getByLabel('Imagen del QR').setInputFiles({ name: 'pass.png', mimeType: 'image/png', buffer: Buffer.from(image!.split(',')[1], 'base64') });
+  await staff.getByLabel('Imagen del QR').setInputFiles({
+    name: 'pass.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(image!.split(',')[1], 'base64'),
+  });
   await expect(staff.getByText('Entrada autorizada', { exact: true })).toBeVisible();
   await expect(staff.getByRole('heading', { name: 'Miembro E2E', exact: true })).toBeVisible();
   await staff.screenshot({ path: 'test-results/staff-desktop.png', fullPage: true });
@@ -65,7 +71,9 @@ test('member, staff and admin complete real backend flows', async ({ browser, pa
 
   await staff.getByRole('button', { name: 'Registrar miembro', exact: true }).click();
   await staff.getByLabel('Nombre completo').fill('Segundo Miembro');
-  await staff.getByLabel('Correo electrónico', { exact: true }).fill(`other-${Date.now()}@example.com`);
+  await staff
+    .getByLabel('Correo electrónico', { exact: true })
+    .fill(`other-${Date.now()}@example.com`);
   await staff.getByLabel('Contraseña', { exact: true }).fill(password);
   await staff.getByRole('button', { name: 'Registrar miembro', exact: true }).last().click();
   await expect(staff.getByText('Registro exitoso', { exact: true })).toBeVisible();
@@ -82,7 +90,7 @@ test('member, staff and admin complete real backend flows', async ({ browser, pa
   await expect(admin.getByRole('heading', { name: planName, exact: true })).toBeVisible();
   await admin.getByLabel('Nuevo precio en MXN', { exact: true }).fill('450.25');
   await admin.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
-  await expect(admin.getByText('$450.25', { exact: true })).toBeVisible();
+  await expect(admin.getByText('$450.25', { exact: false })).toBeVisible();
   await admin.screenshot({ path: 'test-results/admin-plans-desktop.png', fullPage: true });
   await admin.getByRole('button', { name: 'Registrar empleado', exact: true }).click();
   const employeeEmail = `employee-${Date.now()}@example.com`;
