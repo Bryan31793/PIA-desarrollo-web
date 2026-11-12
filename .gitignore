@@ -148,3 +148,11 @@ cython_debug/
 .history/
 
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Python,VisualStudioCode
+# Cliente TypeScript
+node_modules/
+client/dist/
+client/test-results/
+client/playwright-report/
+# El directorio lib del cliente contiene código fuente, no librerías Python.
+!client/src/lib/
+!client/src/lib/**

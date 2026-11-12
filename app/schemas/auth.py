@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from app.core.roles import Role
+
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=128)
@@ -19,4 +21,5 @@ class TokenPairResponse(BaseModel):
 
 class ProtectedResponse(BaseModel):
     message: str
-    username: str
+    subject: str
+    role: Role

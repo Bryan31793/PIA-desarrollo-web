@@ -1,5 +1,13 @@
 
 services:
+  client:
+    build:
+      context: ./client
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      - backend
+
   backend:
     build:
       context: .
@@ -8,6 +16,9 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       DATABASE_URL: postgresql://admin:${DB_PASSWORD}@db:5432/mi_proyecto
+      DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-10}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-5}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
     volumes:

@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import json
+from urllib.parse import urlencode
 
 import pytest
 from fastapi import FastAPI
@@ -12,16 +13,26 @@ from app.core.exceptions import (
     InvalidTokenError,
     TokenExpiredError,
 )
+from app.core.roles import Role
 from app.routers.error_handlers import register_error_handlers
 
 
-def request(app, method, path, body=None, token=None):
+def request(app, method, path, body=None, token=None, form=False):
     """Exercise the complete ASGI stack without a running server or Redis."""
 
     async def run():
         messages = []
-        payload = json.dumps(body).encode() if body is not None else b""
-        headers = [(b"content-type", b"application/json")]
+        payload = (
+            (urlencode(body) if form else json.dumps(body)).encode()
+            if body is not None
+            else b""
+        )
+        headers = [
+            (
+                b"content-type",
+                b"application/x-www-form-urlencoded" if form else b"application/json",
+            )
+        ]
         if token is not None:
             headers.append((b"authorization", f"Bearer {token}".encode()))
         sent = False
@@ -95,7 +106,12 @@ def auth_app(monkeypatch):
     return importlib.import_module("app.main").app
 
 
-def test_invalid_login(auth_app):
+def test_invalid_login(auth_app, monkeypatch):
+    from app.infrastructure.members.repository import member_repository
+
+    monkeypatch.setattr(
+        member_repository, "find_credentials_by_email", lambda email: None
+    )
     status, headers, body = request(
         auth_app,
         "POST",
@@ -104,6 +120,7 @@ def test_invalid_login(auth_app):
             "username": "demo",
             "password": "wrong",
         },
+        form=True,
     )
     assert status == 401
     assert headers[b"www-authenticate"] == b"Bearer"
@@ -122,13 +139,16 @@ def test_invalid_and_expired_tokens(auth_app, path, method, expired):
     from app.infrastructure.auth.authentication import create_token
 
     kind = "access" if method == "GET" else "refresh"
-    token = create_token("demo", kind, -60)[0] if expired else "invalid-token"
+    token = (
+        create_token("member:1", kind, -60, role=Role.MEMBER)[0]
+        if expired
+        else "invalid-token"
+    )
     status, headers, body = request(
         auth_app,
         method,
         path,
-        body={"refresh_token": token} if method == "POST" else None,
-        token=token if method == "GET" else None,
+        token=token,
     )
     assert status == 401
     assert headers[b"www-authenticate"] == b"Bearer"
@@ -158,7 +178,11 @@ def test_valid_access_token(auth_app, monkeypatch):
     monkeypatch.setattr(
         refresh_token_repository, "is_access_token_active", lambda token_id: True
     )
-    token = create_token("demo", "access", 600)[0]
+    token = create_token("member:1", "access", 600, role=Role.MEMBER)[0]
     status, _, body = request(auth_app, "GET", "/api/protected", token=token)
     assert status == 200
-    assert body == {"message": "Access granted", "username": "demo"}
+    assert body == {
+        "message": "Access granted",
+        "subject": "member:1",
+        "role": "member",
+    }
